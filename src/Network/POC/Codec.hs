@@ -1,9 +1,10 @@
 module Network.POC.Codec
   (
-  decodeHeader
-  ,encodeHeader
-  ,decodeFrame,
-  encodeFrame
+    decodeHeader
+  , encodeHeader
+  , decodeFrames
+  , decodeFrame
+  , encodeFrame
   )where
 
 import Network.POC.Types
@@ -60,8 +61,13 @@ decodeHeader = undefined
 encodeHeader :: Header -> BS.ByteString
 encodeHeader = undefined
 
-decodeFrame :: BS.ByteString -> Frame
+decodeFrame :: BS.ByteString -> (Frame, BS.ByteString)
 decodeFrame = undefined
+
+decodeFrames :: BS.ByteString -> [Frame]
+decodeFrames bs = if BS.null bs
+                    then []
+                    else  let (f, bs') = decodeFrame bs in f : decodeFrames bs'
 
 encodeFrame :: Frame -> BS.ByteString
 encodeFrame = undefined

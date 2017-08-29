@@ -45,6 +45,8 @@ open mgr host port = do
   s <- sock host port
   ctx <- createContext mgr s c
   registerContext mgr c ctx
+  select ctx
+  return ctx
     where
       sock host port = do
         let hints = S.defaultHints { S.addrSocketType = S.Datagram, S.addrProtocol = 17 }
@@ -53,6 +55,25 @@ open mgr host port = do
 
       registerContext :: Manager -> ConnectionId -> Context -> IO Context
       registerContext mgr c ctx = modifyMVar (managerToContext mgr) (\ m -> return (M.insert c ctx m, ctx))
+
+      select :: Context  -> IO ()
+      select ctx = do
+        forkIO $ forever $ f ctx
+        return ()
+        where
+          f ctx = do
+            bs <- readChan (contextRx ctx)
+            let (h,bs') = decodeHeader bs
+                fs      = decodeFrames bs'
+            mapM (share ctx)   fs
+            return ()
+          share :: Context -> Frame -> IO ()
+          share ctx f = case f of
+            (Stream fin  sid offset bs) -> do
+              writeChan (contextRx ctx) bs
+              if fin then putMVar (contextFin ctx) True else return ()
+              return ()
+            _ -> return ()
 
 
 
@@ -84,7 +105,16 @@ send ctx  = writeChan (contextTx ctx)
 
 recv :: Context -> IO ByteString
 recv ctx = do
-    takeMVar (contextFin ctx)
-    bs <- getChanContents (contextRx ctx)
-    return $ BS.concat bs
+    i <- readChan (contextStreamIds ctx)
+    m <- readMVar $ contextStreams ctx
+    case M.lookup i m of
+      Nothing -> undefined -- TODO: throw some exception
+      (Just (fin, input)) -> do
+        takeMVar fin
+        ds <- getChanContents input
+        return $ BS.concat $ map snd $ L.sortBy cmp ds
+
+  where
+    cmp l r = compare (fst l) (fst r)
+
 

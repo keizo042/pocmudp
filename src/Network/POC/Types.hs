@@ -23,7 +23,7 @@ type Offset = Int16
 data Header = Header { headerConnectionId :: !ConnectionId }
               deriving (Eq, Show)
 
-data Frame = Stream !Bool !StreamId !BS.ByteString
+data Frame = Stream !Bool !StreamId !Offset !BS.ByteString
           |  ConnectionClose
           |  Initial ConnectionId
           deriving (Eq, Show)
@@ -44,8 +44,11 @@ data Manager = Manager { managerSocket :: Socket
 -- on the other word, It is called `Session`
 data Context = Context { contextTx :: Chan ByteString
                         , contextRx :: Chan ByteString
+                        , contextFromConnection :: Chan ByteString
                         , contextConnectionId :: MVar ConnectionId
                         , contextFin :: MVar Bool
+                        , contextStreamIds :: Chan StreamId
+                        , contextStreams :: MVar (Map StreamId (MVar Bool, Chan (Offset, BS.ByteString)))
                         , contextClosed :: MVar Bool
                         , contextRemoteHost :: MVar SockAddr}
 

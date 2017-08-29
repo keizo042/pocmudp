@@ -10,10 +10,6 @@ main = do
     ctx <- open mgr   "localhost" 8080 -- Opening Connection
     send ctx "hello world" -- Send Data as Stream Frame
     bs <- recv ctx -- recieve Stream Frame
-    return ()
-{-
-
     BS8.putStrLn  bs
     close ctx -- send Connection Close
     closeManager mgr
-    -}

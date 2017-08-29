@@ -10,6 +10,7 @@ import Network.POC.Types
 import Network.Socket
 
 import Control.Concurrent
+import Data.Map
 import Control.Concurrent.MVar
 import Control.Concurrent.Chan
 import qualified Data.List as L
@@ -19,10 +20,13 @@ createContext mgr addr c = do
   c' <- newMVar c
   tx <- newChan
   rx <- newChan
+  fromConn <- newChan
   fin <- newEmptyMVar
+  stream <- newChan
+  streamid <- newMVar empty
   closed <- newEmptyMVar
   peer <- newMVar addr
-  return $ Context tx rx c' fin closed peer
+  return $ Context tx rx fromConn c' fin stream streamid closed peer
 
 selectID :: Manager -> IO ConnectionId
 selectID mgr = do
