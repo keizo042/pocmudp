@@ -1,5 +1,5 @@
 name:                pocmudp
-version:             0.1.0.0
+version:             0.2.0.0
 -- synopsis:
 -- description:
 homepage:            https://github.com/keizo042/pocmudp#readme
@@ -15,12 +15,13 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Network.POC
-  other-modules:       Network.POC.Codec
-                       Network.POC.Types
-                       Network.POC.Internal
-                       Network.POC.Manager
-                       Network.POC.Utils
+  exposed-modules:     Network.MUDP
+  other-modules:       Network.MUDP.Codec
+                       Network.MUDP.Types
+                       Network.MUDP.Internal
+                       Network.MUDP.Context
+                       Network.MUDP.Session
+                       Network.MUDP.Manager
   build-depends:       base >= 4.7 && < 5
                      , network
                      , bytestring
