@@ -29,12 +29,33 @@ newManager :: String -> Int -> IO Manager
 newManager host port = do
   mgr <- new host port
   handler <- handle (managerSocket mgr) (managerRx mgr) (managerTx mgr)
-  putMVar (managerHandlerId mgr) handler
   deliver <- forkIO $ forever $ delive mgr
+  putMVar (managerHandlerId mgr) handler
   putMVar (managerDeliverId mgr) deliver
   return mgr
 
   where
+    handle :: S.Socket
+            -> Chan (ByteString, S.SockAddr)
+            -> Chan (ByteString, S.SockAddr)
+            -> IO ThreadId
+    handle sock tx rx = forkIO $ do
+      forkIO $ sending  sock tx
+      forkIO $ reciveing sock rx 1024
+      return ()
+      where
+        sending :: S.Socket -> Chan (ByteString, S.SockAddr) -> IO ()
+        sending sock tx = do
+          (bs, addr) <- readChan tx
+          i <- SB.sendTo sock bs addr
+          sending sock tx
+
+        reciveing :: S.Socket -> Chan (ByteString, S.SockAddr) -> Int -> IO ()
+        reciveing sock rx size = do
+          r <- SB.recvFrom sock size
+          writeChan rx r
+          reciveing sock rx size
+
     new host port = do
       sock <- socket' host port
       tx <- newChan
@@ -55,26 +76,7 @@ newManager host port = do
           sock <- S.socket (S.addrFamily info) S.Datagram S.defaultProtocol
           return sock
 
-    handle :: S.Socket
-            -> Chan (ByteString, S.SockAddr)
-            -> Chan (ByteString, S.SockAddr)
-            -> IO ThreadId
-    handle sock tx rx = forkIO $ do
-      forkIO $ sending  sock tx
-      forkIO $ reciveing  sock rx
-      return ()
 
-    sending :: S.Socket -> Chan (ByteString, S.SockAddr) -> IO ()
-    sending sock tx = do
-      (bs, addr) <- readChan tx
-      i <- SB.sendTo sock bs addr
-      sending sock tx
-
-    reciveing :: S.Socket -> Chan (ByteString, S.SockAddr) -> IO ()
-    reciveing sock rx = do
-      r <- SB.recvFrom sock 1280
-      writeChan rx r
-      reciveing sock rx
 
 
     delive :: Manager -> IO ()
@@ -84,10 +86,11 @@ newManager host port = do
       where
         delive' :: Manager -> ByteString -> S.SockAddr -> (MVar (M.Map ConnectionId Context)) -> IO ()
         delive' mgr bs addr mm = do
-          m <- takeMVar mm
+          m <- readMVar mm
           let c = headerConnectionId (fst $ decodeHeader bs)
-              ctx = M.lookup c m
-          case ctx of
+          if isNothing c
+            then return ()
+            else case (M.lookup (fromJust c) m) of
             (Just ctx') -> do
               writeChan (contextRx ctx') bs
             Nothing  -> do

@@ -30,15 +30,15 @@ createContext mgr addr c = do
 
 selectID :: Manager -> IO ConnectionId
 selectID mgr = do
-  ids <- takeMVar $ managerConnectionIds mgr
-  i <- choiceConnectionId 1 ids
-  putMVar (managerConnectionIds mgr) (L.insert i ids)
+  ids <- readMVar $ managerConnectionIds mgr
+  i <- choiceUnusedConnectionId 1 ids
+  modifyMVar_ (managerConnectionIds mgr) (\is -> return $ L.insert i is)
   return i
    where
-    choiceConnectionId :: ConnectionId -> [ConnectionId] -> IO ConnectionId
-    choiceConnectionId _ [] = return 1
-    choiceConnectionId i (x:xs)
-        | (i == x) =  choiceConnectionId (i+1) (x:xs)
+    choiceUnusedConnectionId :: ConnectionId -> [ConnectionId] -> IO ConnectionId
+    choiceUnusedConnectionId _ [] = return 1
+    choiceUnusedConnectionId i (x:xs)
+        | (i == x) =  choiceUnusedConnectionId (i+1) (x:xs)
         | (i < x) = return i
-        | (i > x) = choiceConnectionId i xs
+        | (i > x) = choiceUnusedConnectionId i xs
 

@@ -24,7 +24,7 @@ data Header = Header { headerConnectionId :: !ConnectionId }
               deriving (Eq, Show)
 
 data Frame = Stream !Bool !StreamId !Offset !BS.ByteString
-          |  ConnectionClose
+          |  ConnectionClose ConnectionId
           |  Initial ConnectionId
           deriving (Eq, Show)
 -- |
