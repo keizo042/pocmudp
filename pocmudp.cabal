@@ -52,7 +52,7 @@ test-suite pocmudp-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  exposed-module:      CodecSpec
+  other-modules:     CodecSpec
   build-depends:       base
                      , network
                      , bytestring

@@ -63,8 +63,24 @@ getHeader = getType >>= getHdr
 getFrame :: Get Frame
 getFrame = getTyp >>= getFrm
   where
-    getTyp = fromIntegral <$> getInt8
-    getFrm i = undefined
+    getTyp :: Get Word8
+    getTyp = getWord8
+    getFrm :: Word8 -> Get Frame
+    getFrm i
+      | (testBit i 7) = do
+        sid <- getInt16be
+        offset <- getInt16be
+        len <- getInt16be
+        bs <- getBytes $ fromIntegral len
+        return $ Stream (testBit i 0) sid offset bs
+      | (testBit i 6) = do
+        return ConnectionClose
+      | (testBit i 5) = do
+        return $ ClientInitial
+      | (testBit i 4) = do
+        i <- getConnectionId
+        return $ ServerResponse i
+      | otherwise     = undefined
 
 
 fromConnectionState :: ConnectionState -> Int
@@ -102,7 +118,6 @@ putFrame (Stream fin i o bs) = do
       putData bs = do
         putInt16be . fromIntegral $ BSC.length bs
         putByteString bs
-
 putFrame ConnectionClose = do
     putInt8 0x40
 putFrame ClientInitial = do
