@@ -2,12 +2,17 @@ module Network.MUDP.Codec
   (
     decodePacket
   , encodePacket
+  , getHeader
+  , putHeader
+  , getFrame
+  , putFrame
   )
   where
 
 import Network.MUDP.Types
 
 import Data.Bits
+import Data.Word
 import Data.Int
 import Data.Serialize
 import Data.Serialize.Get
@@ -15,9 +20,30 @@ import Data.Serialize.Put
 
 import qualified Data.ByteString.Char8 as BSC
 
-decodePacket = undefined
+decodePacket :: BSC.ByteString -> Either String Packet
+decodePacket = runGet $ getPacket
+  where
+    getPacket :: Get Packet
+    getPacket = Packet <$> getHeader <*> getFrames
+    getFrames :: Get [Frame]
+    getFrames = do
+      b <- isEmpty
+      if b
+        then return []
+        else do
+          f <- getFrame
+          fs <- getFrames
+          return $ f : fs
 
-encodePacket = undefined
+encodePacket :: Packet -> BSC.ByteString
+encodePacket (Packet hdr payload) = runPut $ do
+    putHeader hdr
+    putFrames payload
+    where
+      putFrames [] = return ()
+      putFrames (f:fs) = do
+        putFrame f
+        putFrames fs
 
 getConnectionId :: Get ConnectionId
 getConnectionId = fromIntegral <$> getInt16be
@@ -34,7 +60,7 @@ getHeader = getType >>= getHdr
         toConnectionState i = if (i .&. 0x80 == 0x80) then Handshake else Transport
 
 
-getFrame :: Get Header
+getFrame :: Get Frame
 getFrame = getTyp >>= getFrm
   where
     getTyp = fromIntegral <$> getInt8
@@ -63,12 +89,12 @@ putHeader (Header s c)    = do
 
 putFrame :: Putter Frame
 putFrame (Stream fin i o bs) = do
-    putInt8 (0x80 .|. finTob fin)
+    putWord8 $ (0x80 .|. finTob fin)
     putStreamId i
     putOffset o
     putData bs
     where
-      finTob :: Bool -> Int8
+      finTob :: Bool -> Word8
       finTob True = 0x01
       finTob False = 0x00
       putStreamId = putInt16be . fromIntegral

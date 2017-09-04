@@ -22,16 +22,15 @@ import Network.MUDP.Context
 
 
 connect :: Manager -> String -> String -> IO Context
-connect mgr host port =   do
+connect mgr host port = do
     addr <- head <$> S.getAddrInfo (Just hints) (Just host) (Just port)
     c <- newConnectionId mgr
     newContext c $ S.addrAddress addr
     where
       hints = S.defaultHints { S.addrSocketType = S.Datagram }
 
-
 listen :: Manager -> IO Context
-listen mgr = undefined
+listen mgr = readChan (managerNextConnection mgr)
 
 send :: Context -> ByteString -> IO Bool
 send ctx bs = do
@@ -50,7 +49,7 @@ recv ctx = do
 close :: Context -> IO Bool
 close ctx = do
     i <- readMVar (contextConnectionId ctx)
-    send ctx $ decodePacket $ pkt i
-    return True
+    send ctx $ encodePacket $ pkt i
   where
+    pkt :: ConnectionId -> Packet
     pkt i = Packet (Header Transport (Just i)) [ConnectionClose]

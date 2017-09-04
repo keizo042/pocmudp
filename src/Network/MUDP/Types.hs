@@ -11,7 +11,7 @@ module Network.MUDP.Types
   ,Packet(..)
   ,Header(..)
   ,ConnectionState(..)
-  ,Payload
+  ,Payload(..)
   ,Frame(..)
   )
   where
@@ -32,10 +32,12 @@ type Offset = Int16
 
 data ConnectionState = Handshake  -- 0x80
                      | Transport  -- 0x00
+                     deriving (Eq, Show)
 
 data Packet = Packet Header Payload
 
 data Header = Header ConnectionState (Maybe ConnectionId) -- 0x40 in type field indicate wheter present  or not
+            deriving (Eq, Show)
 
 type Payload = [Frame]
 
@@ -44,12 +46,14 @@ data Frame = Stream Bool StreamId Offset ByteString
            | ConnectionClose
            | ClientInitial
            | ServerResponse ConnectionId
+           deriving (Eq, Show)
 
 data Manager = Manager  { managerSocket :: Socket
                         , managerLocalSockAddr :: SockAddr
                         , managerConnections :: MVar (M.Map ConnectionId Context)
                         , managerConnectionIds :: MVar [ConnectionId]
                         , managerAddrToConnectionId :: MVar (M.Map SockAddr ConnectionId)
+                        , managerNextConnection :: Chan Context
                         , managerTx :: Chan (Packet, SockAddr)
                         , managerRx :: Chan (ByteString, SockAddr)
                         }

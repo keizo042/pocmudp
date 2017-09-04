@@ -6,7 +6,7 @@ import qualified Data.ByteString.Char8 as BSC
 
 main :: IO ()
 main = do
-    mgr <- newManager "localhost" 8080
+    mgr <- newManager "localhost" 8081
     server mgr
 
 server :: Manager ->  IO ()
