@@ -46,7 +46,7 @@ data Frame = Stream Bool StreamId Offset ByteString
            -- Special Frame, they are only one in the packet
            | ConnectionClose
            | ClientInitial
-           | ServerResponse ConnectionId
+           | ServerResponse
            deriving (Eq, Show)
 
 data ContextInfo = ContextInfo { contextInfoConnections :: MVar (M.Map ConnectionId Context)

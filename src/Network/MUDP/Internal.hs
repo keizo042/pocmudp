@@ -20,6 +20,8 @@ import Network.MUDP.Manager
 import Network.MUDP.Session
 import Network.MUDP.Context
 
+-- Manager Level operation
+-- and init/terminate context
 
 connect :: Manager -> String -> String -> IO Context
 connect mgr host port = do
@@ -28,12 +30,18 @@ connect mgr host port = do
         addr = S.addrAddress info
     ctx <- newContext Nothing addr
     writeChan (managerTx mgr) (pkt, addr)
+    -- TODO: timeout operation when it can not recv handshake repsonse
+    readMVar (contextConnectionId ctx)
     return ctx
     where
       hints = S.defaultHints { S.addrSocketType = S.Datagram }
 
+-- TODO: timeout operation
 listen :: Manager -> IO Context
 listen mgr = readChan (contextInfoNextOne $ managerContextInfo mgr)
+
+
+-- Context level operation
 
 send :: Context -> ByteString -> IO Bool
 send ctx bs = do

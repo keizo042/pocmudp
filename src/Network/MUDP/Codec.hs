@@ -86,9 +86,7 @@ getFrame = getTyp >>= getFrm
         return ConnectionClose
       | (testBit i 5) = do
         return $ ClientInitial
-      | (testBit i 4) = do
-        i <- getConnectionId
-        return $ ServerResponse i
+      | (testBit i 4) = return ServerResponse
       | otherwise     = undefined
 
 
@@ -131,6 +129,5 @@ putFrame ConnectionClose = do
     putInt8 0x40
 putFrame ClientInitial = do
     putInt8 0x20
-putFrame (ServerResponse c)  = do
+putFrame ServerResponse = do
     putInt8 0x10
-    putConnectionId c

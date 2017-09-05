@@ -17,7 +17,7 @@ hdr2 = Header Transport (Just 0x42)
 frame1 = Stream False 0x42 0 "hello"
 frame2 = ConnectionClose
 frame3 = ClientInitial
-frame4 = ServerResponse 042
+frame4 = ServerResponse
 
 spec :: Spec
 spec = do
