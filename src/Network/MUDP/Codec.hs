@@ -2,6 +2,8 @@ module Network.MUDP.Codec
   (
     decodePacket
   , encodePacket
+  , decodeHeader
+  , encodeHeader
   , getHeader
   , putHeader
   , getFrame
@@ -35,6 +37,7 @@ decodePacket = runGet $ getPacket
           fs <- getFrames
           return $ f : fs
 
+
 encodePacket :: Packet -> BSC.ByteString
 encodePacket (Packet hdr payload) = runPut $ do
     putHeader hdr
@@ -44,6 +47,12 @@ encodePacket (Packet hdr payload) = runPut $ do
       putFrames (f:fs) = do
         putFrame f
         putFrames fs
+
+decodeHeader :: BSC.ByteString -> Either String Header
+decodeHeader = runGet $ getHeader
+
+encodeHeader :: Header -> BSC.ByteString
+encodeHeader hdr = runPut $ putHeader hdr
 
 getConnectionId :: Get ConnectionId
 getConnectionId = fromIntegral <$> getInt16be

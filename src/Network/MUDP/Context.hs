@@ -10,14 +10,18 @@ import Network.MUDP.Types
 import Network.Socket
 
 import qualified Data.Map as M
+import Data.Maybe(isJust)
 
 import Control.Concurrent
 import Control.Concurrent.Chan
 import Control.Concurrent.MVar
 
-newContext :: ConnectionId -> SockAddr -> IO Context
+
+newContext :: Maybe ConnectionId -> SockAddr -> IO Context
 newContext connId addr = do
-    connId' <- newMVar connId
+    connId' <- case connId of
+                 (Just i) -> newMVar i
+                 Nothing -> newEmptyMVar
     addr' <- newMVar addr
     sessId <- newMVar 1
     stmIds <- newMVar []

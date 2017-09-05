@@ -1,6 +1,7 @@
 module Network.MUDP.Types
   (
     Manager(..)
+  , ContextInfo(..)
   , Context(..)
   , Session(..)
 
@@ -48,12 +49,15 @@ data Frame = Stream Bool StreamId Offset ByteString
            | ServerResponse ConnectionId
            deriving (Eq, Show)
 
+data ContextInfo = ContextInfo { contextInfoConnections :: MVar (M.Map ConnectionId Context)
+                                ,contextInfoConnectionIds ::  MVar [ConnectionId]
+                                ,contextInfoAddrToConnection :: MVar (M.Map SockAddr Context)
+                                ,contextInfoNextOne :: Chan Context
+                                }
+
 data Manager = Manager  { managerSocket :: Socket
                         , managerLocalSockAddr :: SockAddr
-                        , managerConnections :: MVar (M.Map ConnectionId Context)
-                        , managerConnectionIds :: MVar [ConnectionId]
-                        , managerAddrToConnectionId :: MVar (M.Map SockAddr ConnectionId)
-                        , managerNextConnection :: Chan Context
+                        , managerContextInfo :: ContextInfo
                         , managerTx :: Chan (Packet, SockAddr)
                         , managerRx :: Chan (ByteString, SockAddr)
                         }
@@ -63,7 +67,7 @@ data Context = Context { contextConnectionId :: MVar ConnectionId
                         ,contextNextStreamId :: MVar StreamId
                         ,contextStreamIds :: MVar [StreamId]
                         ,contextTx :: Chan (Packet, SockAddr)
-                        ,contextRx :: Chan (Packet, SockAddr)
+                        ,contextRx :: Chan (ByteString, SockAddr)
                         ,contextClosed :: MVar Bool
                         ,contextSessions :: MVar (M.Map StreamId Session)
                         ,contextDiscoardingSession :: Chan StreamId

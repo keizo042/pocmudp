@@ -23,14 +23,17 @@ import Network.MUDP.Context
 
 connect :: Manager -> String -> String -> IO Context
 connect mgr host port = do
-    addr <- head <$> S.getAddrInfo (Just hints) (Just host) (Just port)
-    c <- newConnectionId mgr
-    newContext c $ S.addrAddress addr
+    info <- head <$> S.getAddrInfo (Just hints) (Just host) (Just port)
+    let pkt = Packet (Header Handshake Nothing) [ClientInitial]
+        addr = S.addrAddress info
+    ctx <- newContext Nothing addr
+    writeChan (managerTx mgr) (pkt, addr)
+    return ctx
     where
       hints = S.defaultHints { S.addrSocketType = S.Datagram }
 
 listen :: Manager -> IO Context
-listen mgr = readChan (managerNextConnection mgr)
+listen mgr = readChan (contextInfoNextOne $ managerContextInfo mgr)
 
 send :: Context -> ByteString -> IO Bool
 send ctx bs = do
