@@ -1,133 +1,128 @@
 module Network.MUDP.Codec
   (
-    decodePacket
-  , encodePacket
+
+    decodeAll
+  , encodeAll
   , decodeHeader
   , encodeHeader
-  , getHeader
-  , putHeader
-  , getFrame
-  , putFrame
+  , decodeFrames
+  , encodeFrames
+
   )
   where
 
-import Network.MUDP.Types
-
 import Data.Bits
-import Data.Word
 import Data.Int
 import Data.Serialize
-import Data.Serialize.Get
 import Data.Serialize.Put
-
+import Data.Serialize.Get
+import Data.ByteString(ByteString)
 import qualified Data.ByteString.Char8 as BSC
 
-decodePacket :: BSC.ByteString -> Either String Packet
-decodePacket = runGet $ getPacket
-  where
-    getPacket :: Get Packet
-    getPacket = Packet <$> getHeader <*> getFrames
-    getFrames :: Get [Frame]
-    getFrames = do
-      b <- isEmpty
-      if b
-        then return []
-        else do
-          f <- getFrame
-          fs <- getFrames
-          return $ f : fs
 
-
-encodePacket :: Packet -> BSC.ByteString
-encodePacket (Packet hdr payload) = runPut $ do
-    putHeader hdr
-    putFrames payload
-    where
-      putFrames [] = return ()
-      putFrames (f:fs) = do
-        putFrame f
-        putFrames fs
-
-decodeHeader :: BSC.ByteString -> Either String Header
-decodeHeader = runGet $ getHeader
-
-encodeHeader :: Header -> BSC.ByteString
-encodeHeader hdr = runPut $ putHeader hdr
+import Network.MUDP.Types
 
 getConnectionId :: Get ConnectionId
-getConnectionId = fromIntegral <$> getInt16be
-
-getHeader :: Get Header
-getHeader = getType >>= getHdr
-  where
-    getType = fromIntegral <$> getInt8
-    getHdr i = do
-      c <- if  (i .&. 0x40 == 0x40)  then Just <$> getConnectionId else return Nothing
-      return $ Header (toConnectionState i) c
-      where
-        toConnectionState :: Int -> ConnectionState
-        toConnectionState i = if (i .&. 0x80 == 0x80) then Handshake else Transport
-
-
-getFrame :: Get Frame
-getFrame = getTyp >>= getFrm
-  where
-    getTyp :: Get Word8
-    getTyp = getWord8
-    getFrm :: Word8 -> Get Frame
-    getFrm i
-      | (testBit i 7) = do
-        sid <- getInt16be
-        offset <- getInt16be
-        len <- getInt16be
-        bs <- getBytes $ fromIntegral len
-        return $ Stream (testBit i 0) sid offset bs
-      | (testBit i 6) = do
-        return ConnectionClose
-      | (testBit i 5) = do
-        return $ ClientInitial
-      | (testBit i 4) = return ServerResponse
-      | otherwise     = undefined
-
-
-fromConnectionState :: ConnectionState -> Int
-fromConnectionState Handshake = 0x80
-fromConnectionState Transport = 0x00
+getConnectionId = fromIntegral <$> getInt64be
 
 putConnectionId :: Putter ConnectionId
-putConnectionId i = putInt16be $ fromIntegral i
+putConnectionId c = putInt64be $ fromIntegral c
+
+getOffset :: Get Offset
+getOffset = fromIntegral <$> getInt32be
+
+putOffset :: Putter Offset
+putOffset o = putInt32be $ fromIntegral o
+
+getStreamId :: Get StreamId
+getStreamId = fromIntegral <$> getInt32be
+
+putStreamId :: Putter StreamId
+putStreamId s = putInt32be $ fromIntegral s
+
+getData :: Get ByteString
+getData = getInt32be >>= (\ i -> getBytes $ fromIntegral i)
+
+putData :: Putter ByteString
+putData bs = do
+    putInt32be $ fromIntegral $ BSC.length bs 
+    putByteString bs
+
+decodeAll :: ByteString -> Packet 
+decodeAll bs = undefined
+
+encodeAll :: Packet -> ByteString
+encodeAll pkt = undefined
+
+decodeHeader :: ByteString -> Maybe Header
+decodeHeader bs = case (runGet getHeader bs) of
+                    (Right hdr) -> Just hdr
+                    _ -> Nothing
+
+getHeader :: Get Header
+getHeader = do
+    w <- getWord8
+    c <- getConnectionIdMaybe w
+    return $ Header (isPhase w) c
+    where
+      isPhase w = if testBit w 7 
+                    then Handhsake
+                    else Transport
+      getConnectionIdMaybe w = if testBit w 0
+                                 then Just <$> getConnectionId
+                                 else return Nothing
+
+
+encodeHeader :: Header -> ByteString
+encodeHeader hdr = runPut $ putHeader hdr
 
 putHeader :: Putter Header
-putHeader (Header s c)    = do
-    putInt8 . fromIntegral $  fromConnectionState s .|. hasConnectionId c
-    putMaybeConnectionId c
-    where
-      putMaybeConnectionId :: Putter (Maybe ConnectionId)
-      putMaybeConnectionId Nothing = return ()
-      putMaybeConnectionId (Just c) = putConnectionId c
+putHeader hdr = undefined
 
-      hasConnectionId Nothing = 0x00
-      hasConnectionId (Just _) = 0x40
+decodeFrames :: ByteString -> Maybe [Frame]
+decodeFrames bs =  case (runGet getFrames bs) of
+                     (Right fs) -> Just fs
+                     _ -> Nothing
+
+encodeFrames :: [Frame] -> ByteString
+encodeFrames fs = runPut $ putFrames fs
+getFrames :: Get [Frame]
+getFrames = do
+    b <- isEmpty 
+    if b
+      then return []
+      else do
+        f   <- getFrame
+        fs  <- getFrames
+        return $ f:fs
+
+
+putFrames :: Putter [Frame]
+putFrames [] =  return ()
+putFrames (f:fs) = do
+    putFrame f
+    putFrames fs
+
+getFrame :: Get Frame
+getFrame = getWord8 >>= getFrame'
+    where
+      getFrame' w 
+        | (testBit w 7) = do
+            s <- getStreamId
+            o <- getOffset
+            bs <- getData 
+            return $ Stream s (testBit w 0)  o bs 
+        | (testBit w 6) = return ClientInitial
+        | (testBit w 5) = return ServerHello
+
+
 
 
 putFrame :: Putter Frame
-putFrame (Stream fin i o bs) = do
-    putWord8 $ (0x80 .|. finTob fin)
-    putStreamId i
+putFrame (Stream sid fin o bs) = do
+    putWord8 $ 0x80 .|. (if fin then 0x01 else 0x00)
+    putStreamId sid
     putOffset o
-    putData bs
-    where
-      finTob :: Bool -> Word8
-      finTob True = 0x01
-      finTob False = 0x00
-      putStreamId = putInt16be . fromIntegral
-      putOffset = putInt16be . fromIntegral
-      putData bs = do
-        putInt16be . fromIntegral $ BSC.length bs
-        putByteString bs
-putFrame ConnectionClose = do
-    putInt8 0x40
-putFrame ClientInitial = do
-    putInt8 0x20
-putFrame ServerResponse = do
-    putInt8 0x10
+    putData bs 
+putFrame ClientInitial = undefined
+putFrame ServerHello   = undefined

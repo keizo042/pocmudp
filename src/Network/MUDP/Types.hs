@@ -1,82 +1,69 @@
 module Network.MUDP.Types
   (
-    Manager(..)
-  , ContextInfo(..)
-  , Context(..)
+    Context(..)
   , Session(..)
+  , SessionInfo(..)
+  , Packet(..)
+  , Header(..)
+  , Frame(..)
 
+  , Phase(..)
   , ConnectionId
   , StreamId
   , Offset
-
-  ,Packet(..)
-  ,Header(..)
-  ,ConnectionState(..)
-  ,Payload(..)
-  ,Frame(..)
   )
   where
 
 import Data.Int
-import Network.Socket
-import Control.Concurrent
-import Control.Concurrent.MVar
-import Control.Concurrent.Chan
-import Data.ByteString (ByteString)
+import Data.ByteString(ByteString)
+import qualified Data.ByteString as BS
+import Data.Map(Map)
 import qualified Data.Map as M
 
-type ConnectionId = Int16
+import Data.Sequence 
+-- using Seq as synchronize Chan
+-- TODO: make it async-safe
 
-type StreamId = Int16
+import Network.Socket
 
-type Offset = Int16
 
-data ConnectionState = Handshake  -- 0x80
-                     | Transport  -- 0x00
-                     deriving (Eq, Show)
+data Context = Context { contextConnectionId :: ConnectionId
+                       , contextSockAddr :: SockAddr
+                       , contextTxSeq :: Seq (ByteString, SockAddr)
+                       , contextRxSeq :: Seq ByteString
+                       , contextClosed :: Bool
+                       , contextSessionInfo :: SessionInfo
+                        }
 
-data Packet = Packet Header Payload
-
-data Header = Header ConnectionState (Maybe ConnectionId) -- 0x40 in type field indicate wheter present  or not
-            deriving (Eq, Show)
-
-type Payload = [Frame]
-
-data Frame = Stream Bool StreamId Offset ByteString
-           -- Special Frame, they are only one in the packet
-           | ConnectionClose
-           | ClientInitial
-           | ServerResponse
-           deriving (Eq, Show)
-
-data ContextInfo = ContextInfo { contextInfoConnections :: MVar (M.Map ConnectionId Context)
-                                ,contextInfoConnectionIds ::  MVar [ConnectionId]
-                                ,contextInfoAddrToConnection :: MVar (M.Map SockAddr Context)
-                                ,contextInfoNextOne :: Chan Context
+data SessionInfo = SessionInfo { sessionInfoSessions :: Map StreamId Session
+                                ,sessionInfoDiscarding :: Seq StreamId
+                                ,sessionInfoNext :: Seq StreamId
                                 }
 
-data Manager = Manager  { managerSocket :: Socket
-                        , managerLocalSockAddr :: SockAddr
-                        , managerContextInfo :: ContextInfo
-                        , managerTx :: Chan (Packet, SockAddr)
-                        , managerRx :: Chan (ByteString, SockAddr)
+
+
+data Session = Session {  sessionNextOne :: Seq StreamId
+                        , sessionTx :: Seq (ByteString, Offset)
+                        , sessionRx :: Seq (ByteString, Offset)
                         }
 
-data Context = Context { contextConnectionId :: MVar ConnectionId
-                        ,contextRemoteSockAddr :: MVar SockAddr
-                        ,contextNextStreamId :: MVar StreamId
-                        ,contextStreamIds :: MVar [StreamId]
-                        ,contextTx :: Chan (Packet, SockAddr)
-                        ,contextRx :: Chan (ByteString, SockAddr)
-                        ,contextClosed :: MVar Bool
-                        ,contextSessions :: MVar (M.Map StreamId Session)
-                        ,contextDiscoardingSession :: Chan StreamId
-                        ,contextNextSession :: Chan Session
-                        }
 
-data Session = Session { sessionStreamId :: StreamId
-                        ,sessionContextTx :: Chan (StreamId, ByteString, Offset)
-                        ,sessionContextRx :: Chan (ByteString, Offset)
-                        ,sessionFin :: MVar Bool
-                        ,sessionFrameSize :: MVar Int
-                        }
+data Packet = Packet Header [Frame]
+
+data Header = Header Phase (Maybe ConnectionId)
+            deriving (Eq, Show)
+
+data Phase = Handhsake | Transport
+           deriving (Eq, Show)
+
+type ConnectionId = Int64
+
+type Offset = Int32
+
+type StreamId = Int32
+
+data Frame = Stream StreamId Bool Offset ByteString
+           | ClientInitial
+           | ServerHello
+           deriving Show
+
