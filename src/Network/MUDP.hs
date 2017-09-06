@@ -16,5 +16,4 @@ module Network.MUDP
 
 import Network.MUDP.Manager
 import Network.MUDP.Types
-import Network.MUDP.Codec
 import Network.MUDP.Internal

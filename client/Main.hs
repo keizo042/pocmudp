@@ -7,7 +7,7 @@ import qualified Control.Exception as E
 import qualified Data.ByteString.Char8 as BS8
 
 main :: IO ()
-main =  client `E.catch` handle
+main =  client -- `E.catch` handle
 
 client :: IO ()
 client = do
